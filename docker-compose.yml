@@ -5,21 +5,26 @@ networks:
 services:
 
   financedb:
-    image: mariadb
+    build: 
+      dockerfile: mariadb.Dockerfile
     restart: always
     volumes:
-      - ./migrations/mysql-migrations.sql:/docker-entrypoint-initdb.d/mysql-mysql-migrations.sql
+      - ./migrations/mysql-migrations.sql.template:/docker-entrypoint-initdb.d/mysql-migrations.sql.template
     ports:
       - "3308:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_APPLICATION_USER}
+      MYSQL_PASSWORD: ${DB_APPLICATION_PASSWORD}
     networks:
       - default
     healthcheck:
-      test: "/usr/bin/mysql --user=root --password=$$MYSQL_ROOT_PASSWORD --execute \"SHOW DATABASES;\""
+      test: "mariadb --user=root --password=${DB_ROOT_PASSWORD} --execute \"SHOW DATABASES;\""
       timeout: 2s
       retries: 10
-
+    command: > 
+      sh -c "envsubst < /docker-entrypoint-initdb.d/mysql-migrations.sql.template > /docker-entrypoint-initdb.d/mysql-migrations.sql && exec docker-entrypoint.sh mariadbd"
   financeapp:
     image: tvergilio/finance:1.3
     environment:
@@ -31,7 +36,7 @@ services:
     expose:
       - "8081"
     depends_on:
-        financedb:
-          condition: service_healthy
+      financedb:
+        condition: service_healthy
     networks:
       - default
